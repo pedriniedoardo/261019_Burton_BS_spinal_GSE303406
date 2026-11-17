@@ -1,0 +1,44 @@
+name: env_R_COSR_export
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # ── Core (unchanged) ──────────────────────────────────────────────────────
+  - r-base=4.4.3
+  - r-remotes=2.5.0
+  - bioconductor-scater=1.34.1
+  - r-seurat=5.3.1
+  - r-tidyverse=2.0.0
+  - r-robustbase=0.99_6
+  - r-patchwork=1.3.2
+  - bioconductor-scuttle=1.16.0
+  - bioconductor-scdblfinder=1.23.4
+  - r-soupx=1.6.2
+  - r-presto=1.0.0
+  - r-harmony=1.2.4
+  - r-hdf5r=1.3.12
+  - r-sccustomize=3.2.4
+  - r-essentials=4.4
+  - r-irkernel=1.3.2
+  - r-devtools=2.4.5
+  - r-data.table
+  - zlib
+  - libzlib
+
+  # ── NEW: h5ad export via zellkonverter ────────────────────────────────────
+  - bioconductor-zellkonverter        # SCE → AnnData writer
+  - bioconductor-singlecellexperiment # explicit; pulled as dep anyway
+  - bioconductor-basilisk             # zellkonverter's Python env manager
+  - r-matrix                          # explicit sparse matrix support
+
+  # ── NEW: loupeR dependencies available on conda ───────────────────────────
+  # loupeR itself is NOT on conda — see manual install note below
+  - r-hdf5r                           # already present; loupeR needs it
+  - r-rcpp                            # loupeR dep
+  - r-rlang                           # loupeR dep
+  
+  # NEW: h5ad export — fully conda-native, no basilisk downloads
+  - python>=3.10          # conda env Python
+  - anndata>=0.10,<0.13    # Python anndata (conda-forge) — pinned below 0.13: r-anndata 0.7.5.6 still passes a `dtype=` kwarg to AnnData() that anndata 0.13+ removed (confirmed working at 0.12.18, confirmed broken at 0.13.2)
+  - r-anndata             # R interface to anndata via reticulate
+  - r-reticulate          # reticulate (likely already a dep of r-anndata)

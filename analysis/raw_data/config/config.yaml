@@ -1,0 +1,266 @@
+# ======================================================================
+# == paths ==
+# ======================================================================
+
+# TBChanged # path or URL to sample sheet (TSV format, columns: sample, condition, ...)
+metadata: "metadata/metadata.tsv"
+
+# To be changed accordingly
+## path or URL to sequencing unit sheet (TSV format, columns: sample, unit, fq1, fq2)
+## Units are technical replicates (e.g. lanes, or resequencing of the same biological
+## sample).
+
+# pypette output
+# samples_csv: "/beegfs/scratch/ric.cosr/pedrini.edoardo/pipeline/scrnaseq_cosr_standard_workflow/results/ena_download/PRJEB39323/samplesheet.csv"
+# samples_csv: "pypette/samples/all/runs/all/samples.csv"
+samples_csv: "config/samplesTestFast03.csv"
+# samples_csv: "results/geo_download/GSE247546/samplesheet.csv"
+
+# metadata path
+samples_meta_csv: 'metadata/metadata.csv'
+
+# yaml file containing the metadata for the annotation step
+meta_annotation: "config/meta_annotation.yaml"
+
+# were to save the output of the processing
+out_location: "results/"
+# stefano suggested to customize the output folder for the seurat preprocessing
+out_location_seurat: "Seurat_base/"
+# out_location_seurat: "Seurat_GSE247546/"
+
+# cell cycle genes location (organism specific)
+df_cc: 
+  9606:  "metadata/data.frame_cc_human.tsv"
+  10090: "metadata/data.frame_cc_mouse.tsv"
+
+# test singlerun
+# samples_csv: "config/samplesTestFast.csv"
+# samples_csv: "config/samplesTestFast02.csv"
+
+# test multirun
+# samples_csv: "config/samplesTestFastRuns.csv"
+
+# ======================================================================
+# == GEO/SRA download (optional pre-processing step) ==
+# ======================================================================
+
+# Downloads FASTQs for a GEO Series accession from SRA and writes a samplesheet.csv (sample_name, sample_run, sample_path) compatible with `samples_csv` above.
+# Run with: snakemake geo_samplesheet Then point `samples_csv` (above) at the generated <out_location>/geo_download/<gse>/samplesheet.csv and run the pipeline as usual.
+# Outputs (including the SRA cache) are written under the top-level `out_location` defined above, so nothing here needs its own out_location/sra_cache path.
+geo_download:
+  # Accession to download: GEO Series (GSE...), BioProject (PRJNA/PRJEB/PRJDB...) or SRA study (SRP/ERP/DRP...) (the legacy key `gse` is still accepted)
+  accession: "GSE158275"
+  env_sratools: "../envs/sratools.yaml"
+  env_metadata: "../envs/pysradb.yaml"
+  # Each SRR's read labels (R1/R2/I1/I2) are checked against the reads: the barcode read (R1)
+  # is the file whose reads start with valid 10x barcodes (whitelists of the cellranger10 in env_cellranger).
+  read_layout_check:
+    n_reads: 10000                # reads sampled per FASTQ
+    min_barcode_match: 0.5        # min fraction of reads starting with a valid barcode to call a file R1
+    allow_length_fallback: false  # opt-in guess from read length when metadata and barcodes both fail
+  # Manual labels for fasterq-dump's _1, _2, ... files. Keys: SRR, GSM or GSE (most specific wins).
+  # A GSE key assumes every GSM has the same file order and fails if the barcodes disagree;
+  # use GSM/SRR keys when samples differ. e.g.
+  #   read_layout_override:
+  #     GSE126321: [R1, R2]
+  #     GSM3596322: [I1, R1, R2]
+  # Use `read_layout_override: {}` when empty; with entries, drop the `{}` and nest them below (block form).
+  read_layout_override: {}
+
+# ======================================================================
+# == ENA download (optional pre-processing step) ==
+# ======================================================================
+
+# Alternative to geo_download for projects whose reads are in ENA but not in SRA (e.g. GSE118257: SRA SRP178139 has no runs, the reads are in ENA PRJEB39323).
+# Downloads the FASTQs submitted to ENA (must be Cell Ranger-named, e.g. <prefix>_S1_L001_R1_001.fastq.gz) and writes a samplesheet.csv compatible with `samples_csv` above.
+# Run with: snakemake ena_samplesheet Then point `samples_csv` (above) at the generated <out_location>/ena_download/<project>/samplesheet.csv and run the pipeline as usual.
+ena_download:
+  # ENA project (PRJEB*/PRJNA*) or study (ERP*/SRP*) accession to download
+  project: "PRJEB39323"
+  env_metadata: "../envs/pysradb.yaml"  # the scripts only need python 3 (standard library)
+
+# ======================================================================
+# == environments ==
+# ======================================================================
+
+# env_cellranger: "/opt/common/tools/ric.cosr/miniconda3/envs/demux"
+# to use this remember to specify the conda prefix in the profile
+env_cellranger: "demux"
+env_cellbender: "../envs/env_cellbender_pip.yaml"
+# env_bioinfo: "/home/pedrini.edoardo/miniconda3/envs/env_bioinfo_minimal"
+env_bioinfo: "../envs/env_bioinfo_minimal.yaml"
+env_seurat: "../envs/env_R_COSR.yaml"
+env_singleR: "../envs/env_singleR.yaml"
+env_annotationCyteTypeR: "../envs/env_cytetypeR.yaml"
+
+# ======================================================================
+# == cellranger ==
+# ======================================================================
+
+INTRON_param: '--include-introns'
+INTRON_flag: 'true'
+BAM_flag: 'true'
+
+# Chemistry passed to `cellranger count --chemistry=`. Leave empty ("") to let cellranger auto-detect it.
+# Set it when auto-detection refuses to run, e.g. 10x Multiome (GEX+ATAC) libraries: cellranger count detects "ARC-v1" and stops with "Cell Ranger detected the chemistry ARC-v1, which may indicate a workflow error". Forcing "ARC-v1" processes the GEX reads of such samples (e.g. GSE189141).
+# Other values: SC3Pv3, SC3Pv4, SC5P-R2, SC5PHT, ... (see `cellranger count --help`).
+# Default case (standard 10x data, auto-detection): set it to an empty string
+#   cellranger_chemistry: ""
+# Forcing a chemistry (e.g. Multiome GEX):
+#   cellranger_chemistry: "ARC-v1"
+cellranger_chemistry: ""
+
+# ======================================================================
+# == Dynamic memory allocation ==
+# ======================================================================
+
+# memory parameters required for resources assignment
+# in "integrateSamples" rule
+memory_per_cell: 1        # MB per cell
+max_mem_mb: 300000        # MB
+
+# ======================================================================
+# == cellbender ==
+# ======================================================================
+
+# add flag to run cellbender or not. Set to False to skip cellbender
+# run_cellbender: True
+run_cellbender: False
+
+# ======================================================================
+# == Automatic annotation ==
+# ======================================================================
+
+# which automatic annotation method(s) to run and merge into the final annotated object (see rule addAnnotations).
+# Any subset/order of: "singleR", "cytetypeR"
+# If the list is left empty, no annotation is passed
+annotation_methods: ["singleR", "cytetypeR"]
+
+# ======================================================================
+# == SingleR annotation (using CELLDEX datasets) ==
+# ======================================================================
+
+SingleR_reference: "BlueprintEncodeData"
+
+# CELLDEX DATABASES:
+
+# BlueprintEncodeData ----------------- [Hs]
+# normalized expression values of 259 RNA-seq samples of pure stroma and immune cells as 
+# generated and supplied by Blueprint and ENCODE
+
+# DatabaseImmuneCellExpressionData ---- [??]
+# normalized expression values of 1561 bulk RNA-seq samples of sorted cell populations 
+# from the Database of Immune Cell Expression (DICE)
+
+# HumanPrimaryCellAtlasData ----------- [Hs]
+# normalized expression values of the data stored in the Human Primary Cell Atlas.
+
+# ImmGenData -------------------------- [Mm]
+# normalized expression values of 830 microarray samples of pure mouse immune cells, 
+# generated by the Immunologic Genome Project (ImmGen)
+
+# MonacoImmuneData -------------------- [??]
+# normalized expression values of 114 bulk RNA-seq samples of sorted immune cell 
+# populations that can be found in GSE107011
+
+# MouseRNAseqData --------------------- [Mm]
+# normalized expression values of 358 bulk RNA-seq samples of sorted cell populations 
+# that can be found at GEO
+
+# NovershternHematopoieticData -------- [Hs]
+# normalized expression values of 211 bulk human microarray samples of sorted hematopoietic 
+# cell populations that can be found in GSE24759
+
+# ======================================================================
+# == CyteTypeR ==
+# ======================================================================
+
+# covariate used in the annotation step
+cov_markers_CyteTypeR: "RNA_snn_res.0.3"
+
+# ======================================================================
+# == Seurat parameters ==
+# ======================================================================
+
+Seurat:
+  FilterGenes:
+    min_fraction_of_cells: 0.01
+  NormalizeData:
+    normalization.method: "LogNormalize"
+    scale.factor: 10000
+  FindVariableFeatures:
+    selection.method: "vst"
+    nfeatures: 2000
+  ScaleData:
+    vars.to.regress: ['nFeature_RNA', 'percent.mt', 'S.Score', 'G2M.Score'] # null
+    scale.max: 10
+  RunPCA:
+    npcs: 50
+  FindNeighbors:
+    dims: 30
+    k.param: 20
+  RunUMAP:
+    dims: 30
+    n.neighbors: 30
+    learning.rate: 1
+    min.dist: 0.3
+    spread: 1
+  FindClusters:
+    resolution: [.3, .6, 1, 1.2]
+  HarmonyIntegration:
+    theta: null # Diversity clustering penalty parameter
+    lambda: null # Ridge regression penalty parameter
+    sigma: 0.1 # Width of soft kmeans clusters
+    max.iter.harmony: 10
+  FindAllMarkers:
+    logfc.threshold: 0.1
+    test.use: "wilcox"
+    min.pct: .1
+    only.pos: true
+
+# ======================================================================
+# == Report ==
+# ======================================================================
+
+report:
+  author: "Aurora Maurizio - Center for Omics Sciences (COSR)"
+  sample_annotations: ['condition', 'time_point']
+  figure_extension: ['pdf', 'png']
+  report_resolution: .3
+  qc_features: [
+    'nFeature_RNA',
+    'nCount_RNA',
+    'percent.mt',
+    'percent.ribo',
+    'percent.globin',
+    'scDblFinder.score'
+    ]
+
+# ======================================================================
+# == Reference Genome ==
+# ======================================================================
+
+ref:
+  # Ensembl species name
+  species: homo_sapiens
+  # species: mus_musculus
+  # Gencode release (make sure to take one where snpeff data is available, check 'snpEff databases' output)
+  release: 45
+  # Genome build
+  build: GRCh38
+  database: gencode
+  organism_id: 9606
+  # organism_id: 10090
+  animal: human
+  # animal: mouse
+  # Path to the reference genome for Cell Ranger (e.g., GRCh38 or mm10)
+  reference: "/beegfs/datasets/buffer/ric.cosr/cellranger/GRCh38_2024-A/GRCh38"
+  # reference: "/beegfs/datasets/buffer/ric.cosr/cellranger/GRCm39_2024-A/GRCm39"
+  reference_gtf: "/beegfs/scratch/ric.cosr/ric.brendolan/BrendolanA_2629_scRNAseq_Only_Seq/GRCm39_2024-A/GRCm39/genes/genes.gtf"
+  reference_fasta: "/beegfs/scratch/ric.cosr/ric.brendolan/BrendolanA_2629_scRNAseq_Only_Seq/GRCm39_2024-A/GRCm39/fasta/genome.fa"
+trans: 
+  # reference: "/beegfs/datasets/buffer/ric.cosr/cellranger_genomes/refdata-gex-mm10-2020-A"
+  transgene_fasta: "/beegfs/scratch/ric.cosr/ric.brendolan/BrendolanA_2629_scRNAseq_Only_Seq/TdTomato.upper.fa"
+  transgene_name: "TdTomato"
+  # test tiny
+  # reference: "/idle/ric.cosr/ric.cosr/pedrini.edoardo/reference/cellranger_tiny_ref"

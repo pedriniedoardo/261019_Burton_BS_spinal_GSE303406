@@ -1,0 +1,17 @@
+# Fill in per project before running annotation.
+# Example empty:
+# title: "CHANGE_ME_title"
+# run_label: "CHANGE_ME_run_label"
+# experiment_name: "CHANGE_ME_experiment_name"
+# study_context: "CHANGE_ME_study_context"
+#
+# Example filled:
+#   title: "CossuG_2128_scRNAseq"
+#   run_label: "CossuG_2128_scRNAseq"
+#   experiment_name: "cell culture"
+#   study_context: "human cell culture"
+
+title: "CHANGE_ME_title"
+run_label: "CHANGE_ME_run_label"
+experiment_name: "CHANGE_ME_experiment_name"
+study_context: "CHANGE_ME_study_context"

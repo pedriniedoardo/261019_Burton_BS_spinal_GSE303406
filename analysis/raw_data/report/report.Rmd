@@ -1,0 +1,518 @@
+---
+title: |
+  ![](../report/logo.DNA_transparent.png){width=3in}
+  \
+subtitle: "scRNAseq COSR Standard Report"
+params:
+  author:     "Aurora Maurizio - Center for Omics Sciences (COSR)"
+  genome:     "SET BY SNAKEMAKE"
+  nPCs:       0
+  resolutions: 0
+  report_resolution: 0
+  seurat_rds: "SET BY SNAKEMAKE"
+  cellbender_tag: "SET BY SNAKEMAKE"
+  cytetype_job_id_file: "SET BY SNAKEMAKE"
+  samples_meta: "SET BY SNAKEMAKE"
+  out_location_seurat: "SET BY SNAKEMAKE"
+author: "`r params$author`"
+date: "`r format(Sys.time(), '%d/%m/%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+    theme: cosmo
+    highlight: tango
+  pdf_document: default
+---
+
+# <span style="color: black;">**PROJECT DESCRIPTION**</span>
+
+\
+
+The analysis was performed on the following samples:\
+
+```{r table_meta, echo=FALSE}
+library("reactable")
+library("htmltools")
+
+meta <- read.csv(params$samples_meta)
+
+reactable(
+  meta[1:4],
+  resizable = TRUE,
+  #filterable = TRUE,
+  searchable = TRUE,
+  highlight = TRUE,
+  outlined = TRUE,
+  bordered = TRUE,
+  striped = TRUE,
+  compact = TRUE,
+  showSortIcon = TRUE,
+  showSortable = TRUE,
+  # Aggiungi uno stile generale per colorare l'intestazione
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = "deepskyblue", # Sfondo azzurro
+      color = "black",            # Testo nero
+      fontWeight = "bold"         # Testo in grassetto
+      # be careful that it doesn't work with some colors
+    )
+  )
+)
+
+```
+
+
+
+\
+
+## <span style="color: black;">**RESULTS**</span>
+
+A series of quality control (QC) filters and checks was applied to each sample to evaluate data integrity. 
+After individual sample analysis, the samples were first merged to assess for the presence of potential batch effects and then integrated. Integration was performed using Harmony procedure to minimize batch effects and highlight meaningful biological differences. The merged and integrated datasets were then characterized to produce unbiased clustering across all samples, UMAP visualizations and cluster-specific marker identification.
+\
+\
+
+## <span style="color: black;">**Filtering**</span>
+
+\
+Here below it is possible to have a look at the distribution of the four features that were evaluated for the filtering:
+\
+\
+
+```{r mainFeatures, echo = FALSE, out.width='80%', fig.align='center', fig.cap='Violin Plots showing the distribution of the main features evaluated to perform the filtering in each sample', fig.show = 'hold'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/vln_", params$cellbender_tag, ".png"))
+```
+\
+
+```{r mainFeatures_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat, "plot/vln_", params$cellbender_tag, ".pdf"),
+                 text = "Download the Violin Plots")
+```
+\
+
+**Each sample was filtered according to the following parameters:**
+
+
+```{r table2, echo=FALSE}
+
+library("reactable")
+library("htmltools")
+
+table2 <- read.csv(paste0(params$out_location_seurat, "table/LUT_QC_", params$cellbender_tag, ".csv"))
+
+reactable(
+  table2,
+  resizable = TRUE,
+  #filterable = TRUE,
+  searchable = TRUE,
+  highlight = TRUE,
+  outlined = TRUE,
+  bordered = TRUE,
+  striped = TRUE,
+  compact = TRUE,
+  showSortIcon = TRUE,
+  showSortable = TRUE,
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = "deepskyblue", # Sfondo blu
+      color = "black",            # Testo nero
+      fontWeight = "bold"         # Testo in grassetto
+    )
+  )
+)
+
+
+```
+
+\
+\
+
+Here below it is possible to check for pre and post filtering statistics:
+
+
+
+```{r table3, echo=FALSE}
+table3 <- read.csv(paste0(params$out_location_seurat, "table/stats_preQC_postQC_", params$cellbender_tag, ".csv"))
+
+reactable(
+  table3,
+  resizable = TRUE,
+  #filterable = TRUE,
+  searchable = TRUE,
+  highlight = TRUE,
+  outlined = TRUE,
+  bordered = TRUE,
+  striped = TRUE,
+  compact = TRUE,
+  showSortIcon = TRUE,
+  showSortable = TRUE,
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = "deepskyblue", # Sfondo azzurro
+      color = "black",            # Testo nero
+      fontWeight = "bold"         # Testo in grassetto
+    )
+  )
+)
+
+```
+\
+
+## <span style="color: black;">**Integration**</span>
+
+The Seurat objects belonging to each sample were then put together to perform 
+the integration step.\
+The total number of cells used for the integration analysis was 48,865 cells.
+\
+The samples were integrated using Harmony, after which the integrated dataset was processed performing PCA and UMAP as dimensional reduction algorithms and applying the SNN clustering to identify distinct cell populations.\
+\
+
+
+## <span style="color: black;">**Clustering**</span>
+
+\
+
+The clustering was performed using `r params$nPCs` nPCs with the following resolutions: `r params$resolutions`. \
+UMAPs were generated for each resolution. \
+
+\
+
+```{r umap-res-loop, echo=FALSE, results='asis'}
+out <- NULL
+
+out <- c(out, "## UMAPs by resolution {.tabset}", "")
+
+for (res in params$resolutions) {
+  res_str <- as.character(res)
+  out <- c(out, knitr::knit_child(
+    text = c(
+      sprintf("### Resolution %s", res_str),
+      "",
+      "```{r echo=FALSE, out.width='100%', fig.align='center'}",
+      sprintf("knitr::include_graphics(paste0(params$out_location_seurat, 'plot/UMAPs/dim_integrated_cluster_RES%s_%s.png'))", res_str, params$cellbender_tag),
+      "```",
+      ""
+    ),
+    quiet = TRUE
+  ))
+}
+
+out <- c(out, "## {- .leave-tabset}", "")
+
+cat(paste(out, collapse = "\n"))
+```
+
+
+
+## QC on UMAP {.tabset}
+
+### Cell Cycle
+```{r UMAP_cc, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_integrated_CellCycle_", params$cellbender_tag, ".png"))
+```
+
+### nFeatures
+```{r UMAP_nf, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_nFeature_RNA_", params$cellbender_tag, ".png"))
+```
+
+### nCounts
+```{r UMAP_nc, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_nCount_RNA_", params$cellbender_tag, ".png"))
+```
+
+### Mitochondrial %
+```{r UMAP_mt, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_percent.mt_", params$cellbender_tag, ".png"))
+```
+
+### Ribosomal %
+```{r UMAP_ribo, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_percent.ribo_", params$cellbender_tag, ".png"))
+```
+
+### Globin %
+```{r UMAP_globin, echo=FALSE, out.width='100%', fig.align='center'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_percent.globin_", params$cellbender_tag, ".png"))
+```
+
+## {- .leave-tabset}
+
+\
+\
+```{r UMAP_download, echo = FALSE}
+
+downloadthis::download_dir(
+  path = paste0(params$out_location_seurat, "plot/UMAPs/"),
+  output_name = "UMAPs",
+  button_label = "Download the folder with all the UMAPs",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = T
+)
+```
+\
+
+
+
+\
+\
+
+# Barplots {.tabset}
+\
+Barplots were generated to better understand the composition of each cluster and the differences between the samples:
+
+```{r barplots-loop, echo=FALSE, results='asis'}
+out <- NULL
+for (res in params$resolutions) {
+  out <- c(out, knitr::knit_child(
+    text = c(
+      sprintf("## Resolution = %s {.tabset}", res),
+      "",
+      "### Cluster per sample",
+      "",
+      "```{r echo=FALSE, out.width='100%', fig.align='center'}",
+      sprintf("knitr::include_graphics(paste0(params$out_location_seurat, 'plot/Barplots/Barplot_bySample_RNA_snn_res.%s.png'))", res),
+      "```",
+      "",
+      "### Cluster per condition",
+      "",
+      "```{r echo=FALSE, out.width='100%', fig.align='center', fig.show='hold'}",
+      sprintf("knitr::include_graphics(paste0(params$out_location_seurat, 'plot/Barplots/Barplot_byCond_RNA_snn_res.%s.png'))", res),
+      "```",
+      ""
+    ),
+    quiet = TRUE
+  ))
+}
+cat(paste(out, collapse = "\n"))
+```
+
+# {- .leave-tabset}
+
+\
+\
+```{r Barplot_download, echo = FALSE}
+  downloadthis::download_dir(
+  path = paste0(params$out_location_seurat, "plot/Barplots/"),
+  output_name = "Barplots",
+  button_label ="Download the folder with all the Barplots",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = T
+  )
+```
+\
+
+
+## <span style="color: black;">**Cluster Markers**</span>
+
+\
+
+The The **`r params$report_resolution` resolution** was selected as the final clustering resolution, and all downstream analyses were performed based on this clustering.
+\
+\
+The differential gene expression analysis was performed among all clusters on the integrated object with the Seurat function `FindAllMarkers`.\
+This one performs a Wilcoxon test to identify gene markers for each cluster compared to all other clusters. The expression for a given gene among cells in a given cluster is compared against the expression of that gene among cells in all other clusters. In the output, pct.1 is the percentage of cells in the cluster where the gene is detected, while pct.2 is the percentage of cells on average in all the other clusters where the gene is detected. A gene to be considered as an IDEAL cluster marker is expected to be expressed exclusively in that cluster and silenced in all others and thus pct.1 will be more towards 1 and pct.2 towards 0.
+\
+
+The top 5 specific markers for each cluster were represented in both a Dotplot and a Heatmap:
+\
+\
+```{r TopMA, echo = FALSE, out.width='100%', fig.align='center', fig.cap='Top 5 specific markers for each cluster'}
+knitr::include_graphics(paste0(params$out_location_seurat,
+                                 "plot/Dotplot_RNA_snn_res.", params$report_resolution, ".png"))
+
+```
+\
+```{r TopMA_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat,
+                                 "plot/Dotplot_RNA_snn_res.", params$report_resolution, ".pdf"),
+                 text = "Download the Dotplot with the top 5 markers for each cluster")
+```
+\
+\
+```{r Heatmap, echo = FALSE, out.width='100%', fig.align='center', fig.cap='Heatmap of the top 5 specific markers for each cluster'}
+knitr::include_graphics(paste0(params$out_location_seurat,
+                               "plot/top5Heatmap_RNA_snn_res.", params$report_resolution, ".png"))
+```
+\
+```{r Heatmap_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat,
+                         "plot/top5Heatmap_RNA_snn_res.", params$report_resolution, ".pdf"),
+                 text = "Download the Heatmap with the top 5 markers for each cluster")
+```
+\
+\
+While here it is possible to download the table with all the statistically significant identified markers:
+\
+```{r FAM_all_download2, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat, "table/integrated_markers_", params$cellbender_tag, ".tsv"),
+                 text = "Download All Markers table")
+```
+\
+
+Finally, a violin plot was generated to check for the main features in each cluster.
+\
+\
+```{r VlnPlot, echo = FALSE, out.width='100%', fig.align='center', fig.cap='Violin plots', fig.show = 'hold'}
+knitr::include_graphics(paste0(params$out_location_seurat,
+                               "plot/Vln_per_cluster_RNA_snn_res.", params$report_resolution, ".png"))
+```
+\
+```{r VlnPlot_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat,
+                         "plot/Vln_per_cluster_RNA_snn_res.", params$report_resolution, ".pdf"),
+                 text = "Download Violin plots")
+```
+\
+\
+
+
+## <span style="color: black;">**Annotation of Clusters**</span>
+
+\
+
+Cell type annotation was performed using **[CyteType](https://cytetype.nygen.io)** and SingleR.
+CyteType is an AI-powered automated annotation platform developed by Nygen Analytics.
+
+CyteType integrates cluster-specific marker genes (identified by `FindAllMarkers`) with UMAP coordinates and leverages large language models trained on curated single-cell atlases to assign biologically meaningful cell type labels to each cluster. The platform returns cluster-level annotations with confidence scores and supporting marker evidence, and provides an interactive web-based visualization for exploring results.
+
+\
+
+```{r cytetype-link, echo=FALSE, results='asis'}
+cytetype_info <- jsonlite::fromJSON(params$cytetype_job_id_file)
+url <- cytetype_info$report_url
+if (!is.null(url) && nzchar(url)) {
+  cat(sprintf(
+    "&#x1F517; **[Click here to explore the CyteType interactive annotation results](%s)**",
+    url
+  ))
+} else {
+  cat("_CyteType annotation URL not available._")
+}
+```
+
+\
+\
+
+## <span style="color: black;">**Loupe Browser Visualization**</span>
+
+In addition to the analyses presented in this report, an interactive visualization of the dataset is provided through the Loupe Browser (10x Genomics). The corresponding .cloupe file, generated with Cell Ranger, is supplied separately, allowing interactive exploration of clusters, gene expression, and cell-level metadata outside of this report.
+\
+\
+
+# <span style="color: black;">**SUPPLEMENTARY MATERIALS**</span>
+
+## <span style="color: black;">**Quality Control**</span>
+
+\
+Sequenced libraries were mapped to the custom reference genome (`r params$genome`) using CellRanger v10 (10x Genomics). A first step of sequencing quality control was made on all files coming from the different samples after collecting them to obtain fastQC files of the sequencing.
+
+1. [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) v0.11.9 (latest v0.12.0): It gives us an idea of the quality of the R2 reads, containing transcripts.
+
+2. [Cellranger](https://www.10xgenomics.com/support/software/cell-ranger/latest) count (v10.0): It was used to select barcodes containing live/high quality cells with a high amount of transcripts.
+
+All these results with their QC logs and plots were collected and presented using [MultiQC](https://multiqc.info/) v1.21 (latest 1.25.1, not tested yet) plots and the html collection of data obtained by Cellranger count function.
+
+ The quality metrics are available by downloading the MultiQC report here:
+\
+```{r QC_report, echo=FALSE, warning=F, message = FALSE}
+xfun::embed_file("../results/multiQC/merged/multiqc_report.html",
+                 text = "Download the MultiQC report")
+```
+\
+
+## <span style="color: black;">**Doublets detection**</span>
+
+\
+
+[scDblFinder](https://plger.github.io/scDblFinder/) was used to detect doublets in the scRNAseq data. Doublets occur when two or more cells are mistakenly captured in the same droplet during the sequencing process, leading to mixed or incorrect transcriptomic profiles for a single cell. In our standard pipeline doublets are just highlighted but not removed.
+
+\
+```{r Doublets, echo = FALSE, out.width='100%', fig.align='center', fig.cap='UMAPs showing the doublets presence', fig.show = 'hold'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_scDblFinder.score_", params$cellbender_tag, ".png"))
+```
+\
+
+```{r Doublets_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat, "plot/UMAPs/dim_scDblFinder.score_", params$cellbender_tag, ".pdf"),
+                 text = "Download the UMAP with doublets")
+```
+\
+
+## <span style="color: black;">**Cell Cycle**</span>
+
+Cell cycle was better inspected and here below it is possible to have a look at the UMAP on cell cycle split by sample, together with the barplot showing the fraction of cells belonging to the three different cell cycle phases in each sample.
+\
+\
+```{r CC1, echo = FALSE, out.width='80%', fig.align='center', fig.cap='UMAP on Cell Cycle split by sample', fig.show = 'hold'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/UMAPs/dim_integrated_CellCycle_split_by_sample", params$cellbender_tag, ".png"))
+
+```
+\
+```{r CC1_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat, "plot/UMAPs/dim_integrated_CellCycle_split_by_sample", params$cellbender_tag, ".pdf"),
+                 text = "Download UMAP on Cell Cycle split by sample")
+```
+\
+\
+```{r CC2, echo = FALSE, out.width='80%', fig.align='center', fig.cap='Barplot on Cell Cycle for each sample', fig.show = 'hold'}
+knitr::include_graphics(paste0(params$out_location_seurat, "plot/Barplot_CC_bySample.png"))
+```
+\
+```{r CC2_download, echo = FALSE}
+xfun::embed_file(paste0(params$out_location_seurat, "plot/Barplot_CC_bySample.pdf"),
+                 text = "Download barplot on Cell Cycle for each sample")
+```
+\
+
+## <span style="color: black;">**Metadata**</span>
+
+
+
+\
+
+
+```{r Metadata_full, echo = FALSE}
+downloadthis::download_file(
+  path        = paste0(params$out_location_seurat, "table/integrated_meta_", params$cellbender_tag, ".tsv"),
+  output_name = "Metadata Table",
+  button_label = "Download the metadata table",
+  button_type  = "primary",
+  has_icon     = TRUE,
+  icon         = "fa fa-save"
+)
+```
+\
+
+
+\
+
+```{r Metadata stats, echo = FALSE}
+downloadthis::download_file(
+  path        = paste0(params$out_location_seurat, "table/stats_preQC_postQC_", params$cellbender_tag, ".csv"),
+  output_name = "Stats pre and post QC table",
+  button_label = "Download the stats pre and post QC table",
+  button_type  = "primary",
+  has_icon     = TRUE,
+  icon         = "fa fa-save"
+)
+```
+\
+
+- Table with number of cells per Seurat cluster in each sample (to do)
+
+
+## <span style="color: black;">**Merged Dataset Analysis**</span>
+
+In addition to the integrated dataset analyses presented in this report, we also provide an analysis based on the merged (non-integrated) dataset. This analysis preserves the original expression values of each sample without batch correction and may be useful for assessing sample-specific features and comparing results with the integrated dataset.
+\
+\
+\
+
+\

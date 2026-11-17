@@ -1,0 +1,20 @@
+# files
+*.log
+*.mro
+.Rhistory
+session.txt
+metadata/metadata*
+*.html
+*.knit.md
+
+# folders
+.snakemake/
+benchmarks/
+logs/
+results/
+pypette/
+logs/
+results_old/
+.Rproj.user
+workflow/test/R44_pixi/out/
+workflow/test/R44_pixi/data/

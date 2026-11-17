@@ -1,0 +1,20 @@
+name: env_singleR
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  # --- Core ---
+  - r-base=4.4.3
+
+  # --- R Packages for Single-Cell Analysis ---
+  - r-seurat=5.3.1
+  - r-tidyverse=2.0.0
+  - r-robustbase=0.99_6
+  - bioconductor-scuttle=1.16.0
+  - bioconda::bioconductor-singler=2.8.0
+  - bioconda::bioconductor-scrnaseq=2.20.0
+  - bioconda::bioconductor-celldex=1.16.0
+  - conda-forge::r-viridis=0.6.5
+  - conda-forge::r-pheatmap=1.0.13
